@@ -361,7 +361,7 @@ export default function AnalysisTab() {
   const balanceColor = comparisonData.balance >= 0 ? "#0C8C76" : "#E05252";
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D2349" />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

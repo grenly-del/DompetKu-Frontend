@@ -165,7 +165,7 @@ export default function HomeTab() {
   if (!fontsLoaded) return <View style={styles.loading} />;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D2349" />
 
       <View style={styles.bgLayer}>

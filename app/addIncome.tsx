@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -30,10 +31,148 @@ import { transactionService } from "../services/transaction.service";
 
 // Income categories now loaded from API
 
+const monthNames = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+];
+
 function formatCurrency(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
   return new Intl.NumberFormat("id-ID").format(Number(digits));
+}
+
+function formatDate(d: Date): string {
+  return `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// ─── DatePickerModal ────────────────────────────────────────────
+function DatePickerModal({
+  visible,
+  currentDate,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  currentDate: Date;
+  onClose: () => void;
+  onSelect: (date: Date) => void;
+}) {
+  const [year, setYear] = useState(currentDate.getFullYear());
+  const [month, setMonth] = useState(currentDate.getMonth());
+  const [day, setDay] = useState(currentDate.getDate());
+
+  useEffect(() => {
+    if (visible) {
+      setYear(currentDate.getFullYear());
+      setMonth(currentDate.getMonth());
+      setDay(currentDate.getDate());
+    }
+  }, [visible, currentDate]);
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(year - 1); }
+    else setMonth(month - 1);
+    setDay(1);
+  };
+
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(year + 1); }
+    else setMonth(month + 1);
+    setDay(1);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={dpStyles.overlay}>
+        <Pressable style={dpStyles.backdrop} onPress={onClose} />
+        <View style={dpStyles.card}>
+          {/* Month navigation */}
+          <View style={dpStyles.navRow}>
+            <Pressable onPress={prevMonth} style={dpStyles.navBtn}>
+              <Feather name="chevron-left" size={20} color="#0C8C76" />
+            </Pressable>
+            <Text style={dpStyles.monthLabel}>
+              {monthNames[month]} {year}
+            </Text>
+            <Pressable onPress={nextMonth} style={dpStyles.navBtn}>
+              <Feather name="chevron-right" size={20} color="#0C8C76" />
+            </Pressable>
+          </View>
+
+          {/* Day names header */}
+          <View style={dpStyles.weekRow}>
+            {dayNames.map((dn) => (
+              <View key={dn} style={dpStyles.weekCell}>
+                <Text style={dpStyles.weekText}>{dn}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Day grid */}
+          <View style={dpStyles.daysGrid}>
+            {cells.map((c, i) => {
+              if (c === null) return <View key={`e${i}`} style={dpStyles.dayCell} />;
+              const isSelected = c === day;
+              const isToday =
+                c === new Date().getDate() &&
+                month === new Date().getMonth() &&
+                year === new Date().getFullYear();
+              return (
+                <Pressable
+                  key={c}
+                  style={[
+                    dpStyles.dayCell,
+                    isSelected && dpStyles.dayCellSelected,
+                    isToday && !isSelected && dpStyles.dayCellToday,
+                  ]}
+                  onPress={() => setDay(c)}
+                >
+                  <Text
+                    style={[
+                      dpStyles.dayText,
+                      isSelected && dpStyles.dayTextSelected,
+                      isToday && !isSelected && dpStyles.dayTextToday,
+                    ]}
+                  >
+                    {c}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Actions */}
+          <View style={dpStyles.actions}>
+            <Pressable style={dpStyles.cancelBtn} onPress={onClose}>
+              <Text style={dpStyles.cancelText}>Batal</Text>
+            </Pressable>
+            <Pressable
+              style={dpStyles.confirmBtn}
+              onPress={() => { onSelect(new Date(year, month, day)); onClose(); }}
+            >
+              <LinearGradient
+                colors={["#0C8C76", "#12B897"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={dpStyles.confirmGradient}
+              >
+                <Text style={dpStyles.confirmText}>Pilih Tanggal</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function AddIncomeScreen() {
@@ -41,8 +180,10 @@ export default function AddIncomeScreen() {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [date, setDate] = useState(new Date());
   const [note, setNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,7 +247,7 @@ export default function AddIncomeScreen() {
         name: name.trim(),
         amount: Number(amount),
         type: 'INCOME',
-        date: new Date().toISOString(),
+        date: date.toISOString(),
         note: note.trim() || undefined,
         categoryId: selectedCategory,
       });
@@ -118,7 +259,7 @@ export default function AddIncomeScreen() {
       setTimeout(() => {
         setSubmitted(false);
         successScale.setValue(0);
-        setName(""); setAmount(""); setSelectedCategory(""); setNote("");
+        setName(""); setAmount(""); setSelectedCategory(""); setNote(""); setDate(new Date());
       }, 2000);
     } catch (err: any) {
       Alert.alert("Gagal", err?.message || "Gagal menyimpan pemasukan");
@@ -223,6 +364,23 @@ export default function AddIncomeScreen() {
               </View>
             </View>
 
+            {/* Date */}
+            <View style={styles.field}>
+              <Text style={styles.label}>TANGGAL</Text>
+              <Pressable
+                style={styles.inputShell}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <View style={styles.dateIconWrap}>
+                  <MaterialCommunityIcons name="calendar-month-outline" size={18} color="#0C8C76" />
+                </View>
+                <Text style={[styles.input, { paddingTop: 17 }]}>{formatDate(date)}</Text>
+                <View style={styles.dateChevron}>
+                  <Feather name="chevron-down" size={16} color="#64748B" />
+                </View>
+              </Pressable>
+            </View>
+
             {/* Notes */}
             <View style={styles.field}>
               <View style={styles.labelRow}>
@@ -277,6 +435,13 @@ export default function AddIncomeScreen() {
         title="Tambah kategori pemasukan"
         subtitle="Buat sumber pemasukan baru lalu langsung pilih di transaksi ini."
         submitLabel="Tambah kategori"
+      />
+
+      <DatePickerModal
+        visible={showDatePicker}
+        currentDate={date}
+        onClose={() => setShowDatePicker(false)}
+        onSelect={setDate}
       />
     </SafeAreaView>
   );
@@ -338,8 +503,150 @@ const styles = StyleSheet.create({
   },
   catAddLabel: { fontSize: 10, fontFamily: "Poppins_600SemiBold", color: "#0C8C76", textAlign: "center" },
 
+  dateIconWrap: {
+    position: "absolute",
+    left: 14,
+    top: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "rgba(12,140,118,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateChevron: {
+    position: "absolute",
+    right: 16,
+    top: 18,
+  },
+
   submitBtn: { marginTop: 6, borderRadius: 20, overflow: "hidden" },
   submitGrad: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   submitInner: { flexDirection: "row", alignItems: "center", gap: 10 },
   submitText: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: "#FFF" },
+});
+
+// ─── DatePicker Modal Styles ────────────────────────────────────
+const dpStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.42)",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 18,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 10,
+  },
+  navRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  navBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "rgba(12, 140, 118, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthLabel: {
+    fontSize: 16,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#102A43",
+  },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  weekCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  weekText: {
+    fontSize: 12,
+    fontFamily: "Poppins_500Medium",
+    color: "#94A3B8",
+  },
+  daysGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  dayCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+  },
+  dayCellSelected: {
+    backgroundColor: "#0C8C76",
+  },
+  dayCellToday: {
+    backgroundColor: "rgba(12, 140, 118, 0.08)",
+  },
+  dayText: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#102A43",
+  },
+  dayTextSelected: {
+    color: "#FFFFFF",
+    fontFamily: "Poppins_600SemiBold",
+  },
+  dayTextToday: {
+    color: "#0C8C76",
+    fontFamily: "Poppins_600SemiBold",
+  },
+  actions: {
+    marginTop: 16,
+    flexDirection: "row",
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#D9E2EC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelText: {
+    fontSize: 14,
+    fontFamily: "Poppins_500Medium",
+    color: "#64748B",
+  },
+  confirmBtn: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  confirmGradient: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmText: {
+    fontSize: 14,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#FFFFFF",
+  },
 });

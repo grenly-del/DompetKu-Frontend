@@ -247,7 +247,7 @@ export default function AccountTab() {
   if (!fontsLoaded) return <View style={styles.loading} />;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D2349" />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

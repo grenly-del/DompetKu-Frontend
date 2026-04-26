@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { authService } from "../services/auth.service";
 import {
   ActivityIndicator,
   Alert,
@@ -105,6 +106,11 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const floatAnimation = useRef(new Animated.Value(0)).current;
   const fadeInAnimation = useRef(new Animated.Value(0)).current;
   const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,6 +169,10 @@ export default function AuthScreen() {
     setPassword("");
     setAgreeTerms(false);
     setShowPassword(false);
+    setResetMode(false);
+    setResetEmail("");
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
   const handleSubmit = async () => {
@@ -205,10 +215,47 @@ export default function AuthScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      "Reset password",
-      "Fitur reset password belum tersambung ke backend di versi ini."
-    );
+    setResetMode(true);
+    setResetEmail(email); // pre-fill with login email if any
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowNewPassword(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetEmail.trim()) {
+      Alert.alert("Email belum diisi", "Masukkan email akunmu.");
+      return;
+    }
+    if (newPassword.trim().length < 6) {
+      Alert.alert("Password terlalu pendek", "Gunakan minimal 6 karakter.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Password tidak cocok", "Pastikan password baru dan konfirmasi sama.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await authService.resetPassword(resetEmail.trim(), newPassword.trim());
+      Alert.alert("Berhasil", res.message || "Password berhasil direset. Silakan login.");
+      setResetMode(false);
+      setEmail(resetEmail);
+      setPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      Alert.alert("Gagal", err?.message || "Terjadi kesalahan. Coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setResetMode(false);
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
   const handleGoogleSignIn = () => {
@@ -405,14 +452,101 @@ export default function AuthScreen() {
 
               <View style={styles.formHeadingWrap}>
                 <Text style={styles.formTitle}>
-                  {isLogin ? "Selamat datang kembali" : "Buat akun baru"}
+                  {resetMode
+                    ? "Reset password"
+                    : isLogin
+                      ? "Selamat datang kembali"
+                      : "Buat akun baru"}
                 </Text>
                 <Text style={styles.formSubtitle}>
-                  {isLogin
-                    ? "Masuk ke akunmu untuk mulai mengelola anggaran harian."
-                    : "Daftar gratis dan mulai rapikan keuanganmu dari satu tempat."}
+                  {resetMode
+                    ? "Masukkan email akunmu dan buat password baru."
+                    : isLogin
+                      ? "Masuk ke akunmu untuk mulai mengelola anggaran harian."
+                      : "Daftar gratis dan mulai rapikan keuanganmu dari satu tempat."}
                 </Text>
               </View>
+
+              {resetMode ? (
+                <>
+                  <AuthField
+                    label="Email"
+                    icon="mail"
+                    value={resetEmail}
+                    onChangeText={setResetEmail}
+                    placeholder="kamu@email.com"
+                    keyboardType="email-address"
+                  />
+
+                  <AuthField
+                    label="Password Baru"
+                    icon="lock"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="Minimal 6 karakter"
+                    secureTextEntry={!showNewPassword}
+                    rightSlot={
+                      <Pressable
+                        style={styles.inputAction}
+                        onPress={() => setShowNewPassword((c) => !c)}
+                      >
+                        <Feather
+                          name={showNewPassword ? "eye-off" : "eye"}
+                          size={18}
+                          color="#64748B"
+                        />
+                      </Pressable>
+                    }
+                  />
+
+                  <AuthField
+                    label="Konfirmasi Password"
+                    icon="lock"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Ulangi password baru"
+                    secureTextEntry={!showNewPassword}
+                  />
+
+                  <Pressable
+                    onPress={handleResetPassword}
+                    disabled={isLoading}
+                    style={({ pressed }) => [
+                      styles.primaryButton,
+                      pressed && !isLoading && styles.buttonPressed,
+                      isLoading && styles.buttonDisabled,
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={["#12406A", "#0C8C76"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.primaryButtonGradient}
+                    >
+                      {isLoading ? (
+                        <>
+                          <ActivityIndicator color="#FFFFFF" />
+                          <Text style={styles.primaryButtonText}>Memproses...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="lock-reset" size={18} color="#FFFFFF" />
+                          <Text style={styles.primaryButtonText}>Reset Password</Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.backToLoginWrap}
+                    onPress={handleBackToLogin}
+                  >
+                    <Feather name="arrow-left" size={14} color="#0C8C76" />
+                    <Text style={styles.backToLoginText}>Kembali ke login</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
 
               {!isLogin ? (
                 <AuthField
@@ -531,6 +665,8 @@ export default function AuthScreen() {
                   </Text>
                 </Pressable>
               </View>
+                </>
+              )}
             </View>
           </Animated.View>
         </ScrollView>
@@ -962,6 +1098,18 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
   switchModeLink: {
+    fontSize: 13,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#0C8C76",
+  },
+  backToLoginWrap: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  backToLoginText: {
     fontSize: 13,
     fontFamily: "Poppins_600SemiBold",
     color: "#0C8C76",

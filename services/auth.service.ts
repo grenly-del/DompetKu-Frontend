@@ -80,4 +80,11 @@ export const authService = {
     fetchApi<{ message: string }>('/auth/account', {
       method: 'DELETE',
     }),
+
+  resetPassword: (email: string, newPassword: string) =>
+    fetchApi<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: { email, newPassword },
+      auth: false,
+    }),
 };
