@@ -19,6 +19,8 @@ export type SummaryResponse = {
 
 export type OverviewResponse = {
   totalBalance: number;
+  totalIncome: number;
+  totalExpense: number;
 };
 
 export type TrendItem = {

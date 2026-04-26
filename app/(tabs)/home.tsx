@@ -23,7 +23,6 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { transactionService, Transaction as TxType } from "../../services/transaction.service";
 import { useBalanceOverview } from "../../hooks/useBalanceOverview";
-import { useMonthlySummary } from "../../hooks/useMonthlySummary";
 import TransactionDetailSheet from "../../components/transactions/TransactionDetailSheet";
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -113,10 +112,6 @@ export default function HomeTab() {
   const [transactions, setTransactions] = useState<TxType[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<TxType | null>(null);
   const [hoveredQuickAction, setHoveredQuickAction] = useState<string | null>(null);
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const { summary } = useMonthlySummary(userId, month, year);
   const { overview, isLoading: isBalanceLoading } = useBalanceOverview(userId);
 
   const [fontsLoaded] = useFonts({
@@ -153,8 +148,8 @@ export default function HomeTab() {
   }, [loadTransactions]);
 
   const balance = overview?.totalBalance ?? 0;
-  const totalIncome = summary ? summary.totalIncome : 0;
-  const totalExpense = summary ? summary.totalExpense : 0;
+  const totalIncome = overview?.totalIncome ?? 0;
+  const totalExpense = overview?.totalExpense ?? 0;
   const displayName = user?.username || 'Pengguna';
   const balanceText = overview
     ? `Rp ${formatRp(balance)}`
@@ -193,10 +188,7 @@ export default function HomeTab() {
               <Text style={styles.greeting}>Hai, {displayName}! 👋</Text>
               <Text style={styles.dateText}>{todayString()}</Text>
             </View>
-            <Pressable style={styles.notifBtn}>
-              <Feather name="bell" size={20} color="#FFFFFF" />
-              <View style={styles.notifDot} />
-            </Pressable>
+
           </View>
 
           {/* Balance */}
