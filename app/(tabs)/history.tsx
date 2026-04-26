@@ -47,8 +47,7 @@ export default function HistoryTab() {
 
   const loadTransactions = useCallback(async () => {
     try {
-      const now = new Date();
-      const params: any = { month: now.getMonth() + 1, year: now.getFullYear(), limit: 50 };
+      const params: any = { limit: 100 };
       if (filter !== 'all') params.type = filter;
       const res = await transactionService.getAll(params);
       setTransactions(res.transactions);

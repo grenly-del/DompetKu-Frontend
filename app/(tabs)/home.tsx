@@ -133,12 +133,12 @@ export default function HomeTab() {
     }
 
     try {
-      const txRes = await transactionService.getAll({ month, year, limit: 5 });
+      const txRes = await transactionService.getAll({ limit: 5 });
       setTransactions(txRes.transactions);
     } catch (err) {
       console.error('Home load error:', err);
     }
-  }, [month, year, userId]);
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -269,7 +269,7 @@ export default function HomeTab() {
 
         <View style={styles.transactionsCard}>
           {transactions.length === 0 ? (
-            <Text style={{ color: '#94A3B8', textAlign: 'center', paddingVertical: 20, fontFamily: 'Poppins_400Regular' }}>Belum ada transaksi bulan ini</Text>
+            <Text style={{ color: '#94A3B8', textAlign: 'center', paddingVertical: 20, fontFamily: 'Poppins_400Regular' }}>Belum ada transaksi</Text>
           ) : transactions.map((tx, idx) => {
             const isIncome = tx.type === "INCOME";
             const txDate = new Date(tx.date);

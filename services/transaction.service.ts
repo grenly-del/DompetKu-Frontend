@@ -19,7 +19,16 @@ type TransactionsResponse = {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 };
 
-type TransactionResponse = { message: string; transaction: Transaction };
+type TransactionResponse = {
+  message: string;
+  transaction: Transaction;
+  budgetWarning?: {
+    categoryName: string;
+    budgetAmount: number;
+    totalSpent: number;
+    overAmount: number;
+  } | null;
+};
 
 type TransactionFilters = {
   type?: 'INCOME' | 'EXPENSE';

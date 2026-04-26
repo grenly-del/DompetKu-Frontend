@@ -318,7 +318,7 @@ export default function AddExpenseScreen() {
     }
     setIsSubmitting(true);
     try {
-      await transactionService.create({
+      const response = await transactionService.create({
         name: name.trim(),
         amount: Number(amount),
         type: 'EXPENSE',
@@ -332,6 +332,21 @@ export default function AddExpenseScreen() {
         Animated.spring(successScale, { toValue: 1.1, tension: 300, friction: 10, useNativeDriver: true }),
         Animated.spring(successScale, { toValue: 1, tension: 300, friction: 10, useNativeDriver: true }),
       ]).start();
+
+      // Show budget warning if exceeded
+      if (response.budgetWarning) {
+        const w = response.budgetWarning;
+        setTimeout(() => {
+          Alert.alert(
+            "⚠️ Melebihi Anggaran!",
+            `Pengeluaran untuk "${w.categoryName}" bulan ini sudah melebihi anggaran.\n\n` +
+            `📋 Anggaran: Rp ${formatAmount(w.budgetAmount)}\n` +
+            `💸 Total terpakai: Rp ${formatAmount(w.totalSpent)}\n` +
+            `🔴 Kelebihan: Rp ${formatAmount(w.overAmount)}`,
+            [{ text: "Mengerti", style: "default" }]
+          );
+        }, 500);
+      }
 
       setTimeout(() => {
         setSubmitted(false);
