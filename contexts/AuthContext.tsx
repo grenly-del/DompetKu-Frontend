@@ -7,6 +7,7 @@ type User = AuthUser;
 type ProfileUpdateInput = {
   name: string;
   email: string;
+  whatsapp?: string | null;
 };
 
 type AuthContextType = {
@@ -15,7 +16,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string, whatsapp?: string) => Promise<void>;
   updateProfile: (data: ProfileUpdateInput) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -42,6 +43,7 @@ function mapApiUser(user: AuthUser): User {
     id: user.id,
     username: user.username,
     email: user.email,
+    whatsapp: user.whatsapp,
     provider: user.provider,
     createdAt: user.createdAt,
   };
@@ -113,8 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await persistSession(res.token, mapApiUser(res.user));
   }, [persistSession]);
 
-  const register = useCallback(async (username: string, email: string, password: string) => {
-    const res = await authService.register(username, email, password);
+  const register = useCallback(async (username: string, email: string, password: string, whatsapp?: string) => {
+    const res = await authService.register(username, email, password, whatsapp);
     await persistSession(res.token, mapApiUser(res.user));
   }, [persistSession]);
 

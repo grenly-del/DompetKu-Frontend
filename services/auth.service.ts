@@ -4,6 +4,7 @@ export type AuthUser = {
   id: string;
   username: string;
   email: string;
+  whatsapp?: string | null;
   provider?: string;
   createdAt?: string;
 };
@@ -30,6 +31,7 @@ export type AccountSummaryResponse = {
 type UpdateProfileInput = {
   name: string;
   email: string;
+  whatsapp?: string | null;
 };
 
 type ChangePasswordInput = {
@@ -38,10 +40,10 @@ type ChangePasswordInput = {
 };
 
 export const authService = {
-  register: (username: string, email: string, password: string) =>
+  register: (username: string, email: string, password: string, whatsapp?: string) =>
     fetchApi<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: { username, email, password },
+      body: { username, email, password, whatsapp: whatsapp || undefined },
       auth: false,
     }),
 
@@ -67,6 +69,7 @@ export const authService = {
       body: {
         username: data.name,
         email: data.email,
+        whatsapp: data.whatsapp ?? undefined,
       },
     }),
 

@@ -18,8 +18,8 @@ import { LinearGradient } from "expo-linear-gradient";
 type Props = {
   visible: boolean;
   onClose: () => void;
-  profile: { name: string; email: string };
-  onSave: (data: { name: string; email: string }) => Promise<void> | void;
+  profile: { name: string; email: string; whatsapp?: string | null };
+  onSave: (data: { name: string; email: string; whatsapp?: string | null }) => Promise<void> | void;
 };
 
 const { height: SH } = Dimensions.get("window");
@@ -27,6 +27,7 @@ const { height: SH } = Dimensions.get("window");
 export default function EditProfileModal({ visible, onClose, profile, onSave }: Props) {
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
+  const [whatsapp, setWhatsapp] = useState(profile.whatsapp || "");
   const [isSaving, setIsSaving] = useState(false);
   const slide = React.useRef(new Animated.Value(SH)).current;
 
@@ -34,6 +35,7 @@ export default function EditProfileModal({ visible, onClose, profile, onSave }: 
     if (visible) {
       setName(profile.name);
       setEmail(profile.email);
+      setWhatsapp(profile.whatsapp || "");
       Animated.spring(slide, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }).start();
     } else {
       slide.setValue(SH);
@@ -52,7 +54,7 @@ export default function EditProfileModal({ visible, onClose, profile, onSave }: 
 
     try {
       setIsSaving(true);
-      await onSave({ name: name.trim(), email: email.trim() });
+      await onSave({ name: name.trim(), email: email.trim(), whatsapp: whatsapp.trim() || null });
       Alert.alert("Berhasil", "Profil berhasil diperbarui!");
       handleClose();
     } catch (err: any) {
@@ -109,6 +111,14 @@ export default function EditProfileModal({ visible, onClose, profile, onSave }: 
             <View style={s.inputShell}>
               <Feather name="mail" size={17} color="#64748B" style={s.inputIcon} />
               <TextInput value={email} onChangeText={setEmail} placeholder="Masukkan email..." placeholderTextColor="#94A3B8" style={s.input} keyboardType="email-address" autoCapitalize="none" />
+            </View>
+          </View>
+
+          <View style={s.field}>
+            <Text style={s.label}>NOMOR WHATSAPP</Text>
+            <View style={s.inputShell}>
+              <Feather name="phone" size={17} color="#64748B" style={s.inputIcon} />
+              <TextInput value={whatsapp} onChangeText={setWhatsapp} placeholder="6281234567890" placeholderTextColor="#94A3B8" style={s.input} keyboardType="phone-pad" />
             </View>
           </View>
 

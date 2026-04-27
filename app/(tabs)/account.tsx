@@ -49,6 +49,7 @@ type MenuItemProps = {
 type ProfileState = {
   name: string;
   email: string;
+  whatsapp?: string | null;
   provider?: string;
   createdAt?: string;
 };
@@ -62,6 +63,7 @@ type AccountStats = {
 const defaultProfile: ProfileState = {
   name: "Pengguna",
   email: "-",
+  whatsapp: null,
 };
 
 const defaultStats: AccountStats = {
@@ -139,6 +141,7 @@ export default function AccountTab() {
   const [profile, setProfile] = useState<ProfileState>({
     name: user?.username ?? defaultProfile.name,
     email: user?.email ?? defaultProfile.email,
+    whatsapp: user?.whatsapp ?? defaultProfile.whatsapp,
     provider: user?.provider,
     createdAt: user?.createdAt,
   });
@@ -150,6 +153,7 @@ export default function AccountTab() {
     setProfile({
       name: user?.username ?? defaultProfile.name,
       email: user?.email ?? defaultProfile.email,
+      whatsapp: user?.whatsapp ?? defaultProfile.whatsapp,
       provider: user?.provider,
       createdAt: user?.createdAt,
     });
@@ -171,6 +175,7 @@ export default function AccountTab() {
       setProfile({
         name: summary.user.username,
         email: summary.user.email,
+        whatsapp: summary.user.whatsapp,
         provider: summary.user.provider,
         createdAt: summary.user.createdAt,
       });
@@ -389,7 +394,7 @@ export default function AccountTab() {
       <EditProfileModal
         visible={showEditProfile}
         onClose={() => setShowEditProfile(false)}
-        profile={{ name: profile.name, email: profile.email }}
+        profile={{ name: profile.name, email: profile.email, whatsapp: profile.whatsapp }}
         onSave={handleUpdateProfile}
       />
       <NotificationModal

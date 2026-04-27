@@ -106,6 +106,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [whatsapp, setWhatsapp] = useState("");
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -167,6 +168,7 @@ export default function AuthScreen() {
     setUsername("");
     setEmail("");
     setPassword("");
+    setWhatsapp("");
     setAgreeTerms(false);
     setShowPassword(false);
     setResetMode(false);
@@ -204,7 +206,7 @@ export default function AuthScreen() {
       if (isLogin) {
         await auth.login(email.trim(), password.trim());
       } else {
-        await auth.register(username.trim(), email.trim(), password.trim());
+        await auth.register(username.trim(), email.trim(), password.trim(), whatsapp.trim() || undefined);
       }
       router.replace("/(tabs)/home" as never);
     } catch (err: any) {
@@ -555,6 +557,18 @@ export default function AuthScreen() {
                   value={username}
                   onChangeText={setUsername}
                   placeholder="karenbudget"
+                  autoCapitalize="none"
+                />
+              ) : null}
+
+              {!isLogin ? (
+                <AuthField
+                  label="Nomor WhatsApp"
+                  icon="phone"
+                  value={whatsapp}
+                  onChangeText={setWhatsapp}
+                  placeholder="6281234567890"
+                  keyboardType="default"
                   autoCapitalize="none"
                 />
               ) : null}
