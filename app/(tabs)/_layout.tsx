@@ -1,13 +1,13 @@
-import React from "react";
-import { StyleSheet, View } from "react-native";
-import { Tabs } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  useFonts,
   Poppins_500Medium,
   Poppins_600SemiBold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
   name: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -17,9 +17,9 @@ type TabIconProps = {
 
 function TabIcon({ name, color, focused }: TabIconProps) {
   return (
-    <View style={styles.iconWrap}>
+    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <MaterialCommunityIcons name={name} size={24} color={color} />
-      <View style={[styles.activeIndicator, { opacity: focused ? 1 : 0 }]} />
+      {focused && <View style={styles.activeDot} />}
     </View>
   );
 }
@@ -29,34 +29,41 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   if (!fontsLoaded) return null;
 
-  // Safe area bottom + extra 10px padding
-  const safeBottom = insets.bottom + 10;
+  const floatingBottom = Math.max(insets.bottom, 2);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#0C8C76",
-        tabBarInactiveTintColor: "#94A3B8",
+        tabBarInactiveTintColor: "#8A9AAF",
         tabBarLabelStyle: {
           fontFamily: "Poppins_500Medium",
-          fontSize: 11,
-          marginTop: -2,
-          marginBottom: 6,
+          fontSize: 10,
+          marginTop: 2,
+          marginBottom: 8,
         },
         tabBarStyle: {
+          position: "absolute",
+          left: 18,
+          right: 18,
+          bottom: floatingBottom,
           backgroundColor: "#FFFFFF",
-          borderTopWidth: 1,
-          borderTopColor: "#E2E8F0",
-          height: 68 + safeBottom,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: "rgba(217, 226, 236, 0.9)",
+          borderRadius: 30,
+          height: 74,
           paddingTop: 8,
-          paddingBottom: safeBottom,
+          paddingBottom: 8,
+          paddingHorizontal: 8,
           shadowColor: "#0F172A",
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 8,
+          shadowOpacity: 0.14,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 12 },
+          elevation: 18,
         },
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tabs.Screen
@@ -103,14 +110,23 @@ const styles = StyleSheet.create({
   iconWrap: {
     alignItems: "center",
     justifyContent: "center",
-    width: 40,
-    height: 36,
+    width: 48,
+    height: 34,
+    borderRadius: 18,
   },
-  activeIndicator: {
-    width: 24,
-    height: 3,
+  iconWrapActive: {
+    backgroundColor: "rgba(12, 140, 118, 0.1)",
+  },
+  activeDot: {
+    position: "absolute",
+    bottom: 1,
+    width: 4,
+    height: 4,
     borderRadius: 2,
     backgroundColor: "#0C8C76",
-    marginTop: 4,
+  },
+  tabBarItem: {
+    borderRadius: 24,
+    paddingVertical: 2,
   },
 });

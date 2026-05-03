@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -29,7 +30,10 @@ const { height: SH } = Dimensions.get("window");
 export default function DeleteAccountModal({ visible, onClose, onDelete, userLabel, stats }: Props) {
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const insets = useSafeAreaInsets();
   const slide = React.useRef(new Animated.Value(SH)).current;
+  const safeBottomPadding = 28 + Math.max(insets.bottom, 12);
+  const sheetMaxHeight = SH - insets.top - Math.max(insets.bottom, 12) - 16;
 
   useEffect(() => {
     if (visible) {
@@ -80,7 +84,16 @@ export default function DeleteAccountModal({ visible, onClose, onDelete, userLab
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={s.overlay}>
         <Pressable style={s.backdrop} onPress={handleClose} />
-        <Animated.View style={[s.sheet, { transform: [{ translateY: slide }] }]}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              maxHeight: sheetMaxHeight,
+              paddingBottom: safeBottomPadding,
+              transform: [{ translateY: slide }],
+            },
+          ]}
+        >
           <View style={s.handle} />
 
           <View style={s.warningCircle}>

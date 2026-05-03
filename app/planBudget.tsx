@@ -38,6 +38,8 @@ const monthNames = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
+const PAGE_SIZE = 5;
+
 // Budget categories loaded from API
 
 type PlanItem = {
@@ -60,6 +62,7 @@ export default function PlanBudgetScreen() {
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [editingAmount, setEditingAmount] = useState("");
   const [mutatingBudgetId, setMutatingBudgetId] = useState<string | null>(null);
+  const [budgetPage, setBudgetPage] = useState(1);
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -89,6 +92,10 @@ export default function PlanBudgetScreen() {
   }, [loadBudgetData]);
 
   useEffect(() => {
+    setBudgetPage(1);
+  }, [existingBudgets.length, currentMonth, currentYear]);
+
+  useEffect(() => {
     if (!fontsLoaded) return;
     Animated.stagger(120, [
       Animated.spring(headerAnim, { toValue: 1, tension: 60, friction: 10, useNativeDriver: true }),
@@ -114,6 +121,11 @@ export default function PlanBudgetScreen() {
   const budgetNum = Number(totalBudget) || 0;
   const remaining = budgetNum - totalPlanned;
   const existingTotalBudget = existingBudgets.reduce((sum, budget) => sum + Number(budget.amount), 0);
+  const budgetTotalPages = Math.max(1, Math.ceil(existingBudgets.length / PAGE_SIZE));
+  const safeBudgetPage = Math.min(budgetPage, budgetTotalPages);
+  const budgetStart = (safeBudgetPage - 1) * PAGE_SIZE;
+  const paginatedBudgets = existingBudgets.slice(budgetStart, budgetStart + PAGE_SIZE);
+  const showBudgetPagination = existingBudgets.length > PAGE_SIZE;
 
   const handleStartEdit = (budget: BudgetItem) => {
     setEditingBudgetId(budget.id);
@@ -265,85 +277,113 @@ export default function PlanBudgetScreen() {
                   <Text style={styles.loadingListText}>Memuat planning...</Text>
                 </View>
               ) : existingBudgets.length > 0 ? (
-                <View style={styles.budgetList}>
-                  {existingBudgets.map((budget) => {
-                    const isEditing = editingBudgetId === budget.id;
-                    const isMutating = mutatingBudgetId === budget.id;
-                    const categoryName = budget.category?.name || "Tanpa kategori";
-                    const categoryIcon = budget.category?.icon || "wallet-outline";
+                <>
+                  <View style={styles.listMeta}>
+                    <Text style={styles.listMetaText}>
+                      Menampilkan {budgetStart + 1}-{Math.min(budgetStart + PAGE_SIZE, existingBudgets.length)} dari {existingBudgets.length} planning
+                    </Text>
+                  </View>
 
-                    return (
-                      <View key={budget.id} style={styles.budgetItem}>
-                        <View style={styles.budgetItemTop}>
-                          <View style={styles.budgetInfo}>
-                            <View style={styles.budgetIcon}>
-                              <MaterialCommunityIcons name={categoryIcon as any} size={20} color="#12406A" />
+                  <View style={styles.budgetList}>
+                    {paginatedBudgets.map((budget) => {
+                      const isEditing = editingBudgetId === budget.id;
+                      const isMutating = mutatingBudgetId === budget.id;
+                      const categoryName = budget.category?.name || "Tanpa kategori";
+                      const categoryIcon = budget.category?.icon || "wallet-outline";
+
+                      return (
+                        <View key={budget.id} style={styles.budgetItem}>
+                          <View style={styles.budgetItemTop}>
+                            <View style={styles.budgetInfo}>
+                              <View style={styles.budgetIcon}>
+                                <MaterialCommunityIcons name={categoryIcon as any} size={20} color="#12406A" />
+                              </View>
+                              <View style={styles.budgetTextWrap}>
+                                <Text style={styles.budgetName} numberOfLines={1}>{categoryName}</Text>
+                                <Text style={styles.budgetPeriod}>{monthNames[budget.month - 1]} {budget.year}</Text>
+                              </View>
                             </View>
-                            <View style={styles.budgetTextWrap}>
-                              <Text style={styles.budgetName} numberOfLines={1}>{categoryName}</Text>
-                              <Text style={styles.budgetPeriod}>{monthNames[budget.month - 1]} {budget.year}</Text>
-                            </View>
+
+                            {!isEditing && (
+                              <View style={styles.budgetActions}>
+                                <Pressable
+                                  style={styles.iconActionBtn}
+                                  onPress={() => handleStartEdit(budget)}
+                                  disabled={isMutating}
+                                >
+                                  <Feather name="edit-2" size={15} color="#12406A" />
+                                </Pressable>
+                                <Pressable
+                                  style={[styles.iconActionBtn, styles.deleteActionBtn]}
+                                  onPress={() => handleDeleteBudget(budget)}
+                                  disabled={isMutating}
+                                >
+                                  <Feather name="trash-2" size={15} color="#E05252" />
+                                </Pressable>
+                              </View>
+                            )}
                           </View>
 
-                          {!isEditing && (
-                            <View style={styles.budgetActions}>
+                          {isEditing ? (
+                            <View style={styles.editBudgetRow}>
+                              <View style={styles.editInputWrap}>
+                                <View style={styles.rpSmall}><Text style={styles.rpSmallText}>Rp</Text></View>
+                                <TextInput
+                                  value={formatRp(editingAmount)}
+                                  onChangeText={(v) => setEditingAmount(v.replace(/\D/g, ""))}
+                                  placeholder="0"
+                                  placeholderTextColor="#94A3B8"
+                                  keyboardType="numeric"
+                                  style={styles.editBudgetInput}
+                                />
+                              </View>
                               <Pressable
-                                style={styles.iconActionBtn}
-                                onPress={() => handleStartEdit(budget)}
+                                style={[styles.editActionBtn, styles.saveEditBtn]}
+                                onPress={() => handleSaveEdit(budget)}
                                 disabled={isMutating}
                               >
-                                <Feather name="edit-2" size={15} color="#12406A" />
+                                {isMutating ? (
+                                  <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                  <Feather name="check" size={16} color="#FFFFFF" />
+                                )}
                               </Pressable>
                               <Pressable
-                                style={[styles.iconActionBtn, styles.deleteActionBtn]}
-                                onPress={() => handleDeleteBudget(budget)}
+                                style={[styles.editActionBtn, styles.cancelEditBtn]}
+                                onPress={handleCancelEdit}
                                 disabled={isMutating}
                               >
-                                <Feather name="trash-2" size={15} color="#E05252" />
+                                <Feather name="x" size={16} color="#64748B" />
                               </Pressable>
                             </View>
+                          ) : (
+                            <Text style={styles.budgetAmount}>Rp {formatRp(String(Number(budget.amount)))}</Text>
                           )}
                         </View>
+                      );
+                    })}
+                  </View>
 
-                        {isEditing ? (
-                          <View style={styles.editBudgetRow}>
-                            <View style={styles.editInputWrap}>
-                              <View style={styles.rpSmall}><Text style={styles.rpSmallText}>Rp</Text></View>
-                              <TextInput
-                                value={formatRp(editingAmount)}
-                                onChangeText={(v) => setEditingAmount(v.replace(/\D/g, ""))}
-                                placeholder="0"
-                                placeholderTextColor="#94A3B8"
-                                keyboardType="numeric"
-                                style={styles.editBudgetInput}
-                              />
-                            </View>
-                            <Pressable
-                              style={[styles.editActionBtn, styles.saveEditBtn]}
-                              onPress={() => handleSaveEdit(budget)}
-                              disabled={isMutating}
-                            >
-                              {isMutating ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                              ) : (
-                                <Feather name="check" size={16} color="#FFFFFF" />
-                              )}
-                            </Pressable>
-                            <Pressable
-                              style={[styles.editActionBtn, styles.cancelEditBtn]}
-                              onPress={handleCancelEdit}
-                              disabled={isMutating}
-                            >
-                              <Feather name="x" size={16} color="#64748B" />
-                            </Pressable>
-                          </View>
-                        ) : (
-                          <Text style={styles.budgetAmount}>Rp {formatRp(String(Number(budget.amount)))}</Text>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
+                  {showBudgetPagination && (
+                    <View style={styles.pagination}>
+                      <Pressable
+                        style={[styles.pageIconBtn, safeBudgetPage === 1 && styles.pageBtnDisabled]}
+                        onPress={() => setBudgetPage((page) => Math.max(1, page - 1))}
+                        disabled={safeBudgetPage === 1}
+                      >
+                        <Feather name="chevron-left" size={18} color={safeBudgetPage === 1 ? "#94A3B8" : "#12406A"} />
+                      </Pressable>
+                      <Text style={styles.pageText}>Halaman {safeBudgetPage} dari {budgetTotalPages}</Text>
+                      <Pressable
+                        style={[styles.pageIconBtn, safeBudgetPage === budgetTotalPages && styles.pageBtnDisabled]}
+                        onPress={() => setBudgetPage((page) => Math.min(budgetTotalPages, page + 1))}
+                        disabled={safeBudgetPage === budgetTotalPages}
+                      >
+                        <Feather name="chevron-right" size={18} color={safeBudgetPage === budgetTotalPages ? "#94A3B8" : "#12406A"} />
+                      </Pressable>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={styles.emptyBudgetCard}>
                   <MaterialCommunityIcons name="clipboard-text-outline" size={30} color="#94A3B8" />
@@ -481,6 +521,8 @@ const styles = StyleSheet.create({
   totalPlanBadge: { alignItems: "flex-end", borderRadius: 16, backgroundColor: "rgba(12,140,118,0.10)", paddingHorizontal: 12, paddingVertical: 9 },
   totalPlanLabel: { fontSize: 10, fontFamily: "Poppins_500Medium", color: "#0C8C76" },
   totalPlanValue: { marginTop: 1, fontSize: 12, fontFamily: "Poppins_700Bold", color: "#0C8C76" },
+  listMeta: { marginTop: -4 },
+  listMetaText: { fontSize: 12, fontFamily: "Poppins_500Medium", color: "#64748B" },
   loadingList: { borderRadius: 18, backgroundColor: "#F8FAFC", paddingVertical: 24, alignItems: "center", gap: 8 },
   loadingListText: { fontSize: 12, fontFamily: "Poppins_400Regular", color: "#94A3B8" },
   budgetList: { gap: 10 },
@@ -501,6 +543,10 @@ const styles = StyleSheet.create({
   editActionBtn: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   saveEditBtn: { backgroundColor: "#0C8C76" },
   cancelEditBtn: { backgroundColor: "#F1F5F9" },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  pageIconBtn: { width: 40, height: 40, borderRadius: 14, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E2EC", alignItems: "center", justifyContent: "center" },
+  pageBtnDisabled: { backgroundColor: "#F8FAFC" },
+  pageText: { fontSize: 12, fontFamily: "Poppins_600SemiBold", color: "#102A43" },
   emptyBudgetCard: { borderRadius: 18, backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 18, paddingVertical: 24, alignItems: "center" },
   emptyBudgetTitle: { marginTop: 10, fontSize: 14, fontFamily: "Poppins_700Bold", color: "#102A43" },
   emptyBudgetText: { marginTop: 4, fontSize: 12, fontFamily: "Poppins_400Regular", color: "#94A3B8", textAlign: "center" },

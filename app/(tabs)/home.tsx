@@ -24,6 +24,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import { transactionService, Transaction as TxType } from "../../services/transaction.service";
 import { useBalanceOverview } from "../../hooks/useBalanceOverview";
 import TransactionDetailSheet from "../../components/transactions/TransactionDetailSheet";
+import {
+  HomeHeaderSkeleton,
+  QuickActionsSkeleton,
+  TransactionListSkeleton,
+} from "../../components/common/SkeletonLoader";
 
 // ─── Helpers ──────────────────────────────────────────────────
 const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
@@ -113,6 +118,7 @@ export default function HomeTab() {
   const [selectedTransaction, setSelectedTransaction] = useState<TxType | null>(null);
   const [hoveredQuickAction, setHoveredQuickAction] = useState<string | null>(null);
   const { overview, isLoading: isBalanceLoading } = useBalanceOverview(userId);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [fontsLoaded] = useFonts({
     Poppins_400Regular,
@@ -124,14 +130,16 @@ export default function HomeTab() {
   const loadTransactions = useCallback(async () => {
     if (!userId) {
       setTransactions([]);
+      setIsDataLoading(false);
       return;
     }
-
     try {
       const txRes = await transactionService.getAll({ limit: 5 });
       setTransactions(txRes.transactions);
     } catch (err) {
       console.error('Home load error:', err);
+    } finally {
+      setIsDataLoading(false);
     }
   }, [userId]);
 
@@ -159,8 +167,10 @@ export default function HomeTab() {
 
   if (!fontsLoaded) return <View style={styles.loading} />;
 
+  const floatingTabBottomPadding = 104;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D2349" />
 
       <View style={styles.bgLayer}>
@@ -169,7 +179,10 @@ export default function HomeTab() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: floatingTabBottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header Card ── */}
@@ -182,45 +195,64 @@ export default function HomeTab() {
           <View style={styles.headerOrbTop} />
           <View style={styles.headerOrbBottom} />
 
-          {/* Top row */}
-          <View style={styles.headerTopRow}>
-            <View>
-              <Text style={styles.greeting}>Hai, {displayName}! 👋</Text>
-              <Text style={styles.dateText}>{todayString()}</Text>
-            </View>
-
-          </View>
-
-          {/* Balance */}
-          <View style={styles.balanceSection}>
-            <Text style={styles.balanceLabel}>Total Saldo</Text>
-            <Text style={styles.balanceAmount}>{balanceText}</Text>
-          </View>
-
-          {/* Income / Expense summary */}
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryCard}>
-              <View style={[styles.summaryIconWrap, { backgroundColor: "rgba(52, 224, 161, 0.22)" }]}>
-                <MaterialCommunityIcons name="trending-up" size={18} color="#34E0A1" />
+          {isDataLoading ? (
+            <HomeHeaderSkeleton />
+          ) : (
+            <>
+              <View style={styles.headerTopRow}>
+                <View>
+                  <Text style={styles.greeting}>Hai, {displayName}! 👋</Text>
+                  <Text style={styles.dateText}>{todayString()}</Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.summaryLabel}>Pemasukan</Text>
-                <Text style={styles.summaryValue}>+Rp {formatCompact(totalIncome)}</Text>
+              <View style={styles.balanceSection}>
+                <Text style={styles.balanceLabel}>Total Saldo</Text>
+                <Text style={styles.balanceAmount}>{balanceText}</Text>
               </View>
-            </View>
-            <View style={styles.summaryCard}>
-              <View style={[styles.summaryIconWrap, { backgroundColor: "rgba(242, 201, 76, 0.22)" }]}>
-                <MaterialCommunityIcons name="trending-down" size={18} color="#F2C94C" />
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryCard}>
+                  <View style={[styles.summaryIconWrap, { backgroundColor: "rgba(52, 224, 161, 0.22)" }]}>
+                    <MaterialCommunityIcons name="trending-up" size={18} color="#34E0A1" />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>Pemasukan</Text>
+                    <Text style={styles.summaryValue}>+Rp {formatCompact(totalIncome)}</Text>
+                  </View>
+                </View>
+                <View style={styles.summaryCard}>
+                  <View style={[styles.summaryIconWrap, { backgroundColor: "rgba(242, 201, 76, 0.22)" }]}>
+                    <MaterialCommunityIcons name="trending-down" size={18} color="#F2C94C" />
+                  </View>
+                  <View>
+                    <Text style={styles.summaryLabel}>Pengeluaran</Text>
+                    <Text style={styles.summaryValue}>-Rp {formatCompact(totalExpense)}</Text>
+                  </View>
+                </View>
               </View>
-              <View>
-                <Text style={styles.summaryLabel}>Pengeluaran</Text>
-                <Text style={styles.summaryValue}>-Rp {formatCompact(totalExpense)}</Text>
-              </View>
-            </View>
-          </View>
+            </>
+          )}
 
         </LinearGradient>
 
+        {isDataLoading ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionTitleAccent} />
+                <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+              </View>
+            </View>
+            <QuickActionsSkeleton />
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionTitleAccent} />
+                <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
+              </View>
+            </View>
+            <TransactionListSkeleton rows={5} />
+          </>
+        ) : (
+          <>
         {/* ── Quick Actions ── */}
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -319,6 +351,8 @@ export default function HomeTab() {
             );
           })}
         </View>
+          </>
+        )}
       </ScrollView>
 
       <TransactionDetailSheet

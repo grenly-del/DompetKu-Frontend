@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -20,7 +21,10 @@ type Props = {
 const { height: SH } = Dimensions.get("window");
 
 export default function AboutAppModal({ visible, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   const slide = React.useRef(new Animated.Value(SH)).current;
+  const safeBottomPadding = 28 + Math.max(insets.bottom, 12);
+  const sheetMaxHeight = SH - insets.top - Math.max(insets.bottom, 12) - 16;
 
   useEffect(() => {
     if (visible) {
@@ -38,7 +42,16 @@ export default function AboutAppModal({ visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={s.overlay}>
         <Pressable style={s.backdrop} onPress={handleClose} />
-        <Animated.View style={[s.sheet, { transform: [{ translateY: slide }] }]}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              maxHeight: sheetMaxHeight,
+              paddingBottom: safeBottomPadding,
+              transform: [{ translateY: slide }],
+            },
+          ]}
+        >
           <View style={s.handle} />
 
           {/* App icon */}

@@ -5,6 +5,8 @@ export type AuthUser = {
   username: string;
   email: string;
   whatsapp?: string | null;
+  phoneNumber?: string | null;
+  phone?: string | null;
   provider?: string;
   createdAt?: string;
 };
@@ -69,7 +71,8 @@ export const authService = {
       body: {
         username: data.name,
         email: data.email,
-        whatsapp: data.whatsapp ?? undefined,
+        whatsapp: data.whatsapp ?? null,
+        phoneNumber: data.whatsapp ?? null,
       },
     }),
 

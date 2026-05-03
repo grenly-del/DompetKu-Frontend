@@ -2,6 +2,7 @@ import storage from './storage';
 
 const API_PATH = '/api';
 const DEFAULT_API_URL = 'https://mobile.klabatdev.my.id';
+// const DEFAULT_API_URL = 'http://localhost:4321';
 
 function normalizeApiUrl(url: string) {
   const trimmed = url.trim().replace(/\/+$/, '');

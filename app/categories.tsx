@@ -37,12 +37,15 @@ type Category = {
   count: number;
 };
 
+const PAGE_SIZE = 5;
+
 export default function CategoriesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -73,6 +76,10 @@ export default function CategoriesScreen() {
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filter, categories.length]);
+
   const handleTransactionDeleted = useCallback((transactionId: string) => {
     setCategoryTxs((current) => current.filter((tx) => tx.id !== transactionId));
     setSelectedTransaction(null);
@@ -93,6 +100,11 @@ export default function CategoriesScreen() {
     const matchesSearch = c.name.toLowerCase().includes(normalizedSearch);
     return matchesType && matchesSearch;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredCategories.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const paginatedCategories = filteredCategories.slice(pageStart, pageStart + PAGE_SIZE);
+  const showPagination = filteredCategories.length > PAGE_SIZE;
 
   const columns = width >= 1080 ? 3 : width >= 700 ? 2 : 1;
   const cardWidth = columns === 3 ? "31.9%" : columns === 2 ? "48.8%" : "100%";
@@ -259,22 +271,50 @@ export default function CategoriesScreen() {
 
         {/* Grid */}
         {filteredCategories.length > 0 ? (
-          <View style={styles.grid}>
-            {filteredCategories.map((c) => (
-              <View key={c.id} style={{ width: cardWidth }}>
-                <CategoryCard
-                  icon={c.icon}
-                  name={c.name}
-                  type={c.type}
-                  count={c.count}
-                  onPress={() => handleCategoryPress(c)}
-                  onEdit={() => handleStartEditCategory(c)}
-                  onDelete={() => handleDeleteCategory(c)}
-                  isMutating={mutatingCategoryId === c.id}
-                />
+          <>
+            <View style={styles.gridMeta}>
+              <Text style={styles.gridMetaText}>
+                Menampilkan {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filteredCategories.length)} dari {filteredCategories.length} kategori
+              </Text>
+            </View>
+
+            <View style={styles.grid}>
+              {paginatedCategories.map((c) => (
+                <View key={c.id} style={{ width: cardWidth }}>
+                  <CategoryCard
+                    icon={c.icon}
+                    name={c.name}
+                    type={c.type}
+                    count={c.count}
+                    onPress={() => handleCategoryPress(c)}
+                    onEdit={() => handleStartEditCategory(c)}
+                    onDelete={() => handleDeleteCategory(c)}
+                    isMutating={mutatingCategoryId === c.id}
+                  />
+                </View>
+              ))}
+            </View>
+
+            {showPagination && (
+              <View style={styles.pagination}>
+                <Pressable
+                  style={[styles.pageIconBtn, safePage === 1 && styles.pageBtnDisabled]}
+                  onPress={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={safePage === 1}
+                >
+                  <Feather name="chevron-left" size={18} color={safePage === 1 ? "#94A3B8" : "#12406A"} />
+                </Pressable>
+                <Text style={styles.pageText}>Halaman {safePage} dari {totalPages}</Text>
+                <Pressable
+                  style={[styles.pageIconBtn, safePage === totalPages && styles.pageBtnDisabled]}
+                  onPress={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={safePage === totalPages}
+                >
+                  <Feather name="chevron-right" size={18} color={safePage === totalPages ? "#94A3B8" : "#12406A"} />
+                </Pressable>
               </View>
-            ))}
-          </View>
+            )}
+          </>
         ) : (
           <View style={styles.emptyCard}>
             <Feather name="search" size={22} color="#12406A" />
@@ -367,7 +407,18 @@ const styles = StyleSheet.create({
   addBtnGrad: { minHeight: 44, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8 },
   addBtnText: { fontSize: 13, fontFamily: "Poppins_600SemiBold", color: "#FFF" },
 
+  gridMeta: { marginTop: 16, paddingHorizontal: 2 },
+  gridMetaText: { fontSize: 12, fontFamily: "Poppins_500Medium", color: "#64748B" },
   grid: { marginTop: 16, flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  pagination: {
+    marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
+  },
+  pageIconBtn: {
+    width: 42, height: 42, borderRadius: 14, backgroundColor: "#FFFFFF",
+    borderWidth: 1, borderColor: "#D9E2EC", alignItems: "center", justifyContent: "center",
+  },
+  pageBtnDisabled: { backgroundColor: "#F8FAFC" },
+  pageText: { fontSize: 13, fontFamily: "Poppins_600SemiBold", color: "#102A43" },
 
   emptyCard: {
     marginTop: 18, borderRadius: 24, backgroundColor: "#FFF", paddingHorizontal: 24, paddingVertical: 36,

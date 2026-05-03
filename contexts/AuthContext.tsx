@@ -17,7 +17,7 @@ type AuthContextType = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string, whatsapp?: string) => Promise<void>;
-  updateProfile: (data: ProfileUpdateInput) => Promise<void>;
+  updateProfile: (data: ProfileUpdateInput) => Promise<User>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
@@ -30,7 +30,9 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => {},
   register: async () => {},
-  updateProfile: async () => {},
+  updateProfile: async () => {
+    throw new Error('AuthProvider belum siap');
+  },
   changePassword: async () => {},
   deleteAccount: async () => {},
   logout: async () => {},
@@ -39,11 +41,13 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 function mapApiUser(user: AuthUser): User {
+  const whatsapp = user.whatsapp ?? user.phoneNumber ?? user.phone ?? null;
+
   return {
     id: user.id,
     username: user.username,
     email: user.email,
-    whatsapp: user.whatsapp,
+    whatsapp,
     provider: user.provider,
     createdAt: user.createdAt,
   };
@@ -92,12 +96,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isUnauthorizedError(err)) {
             await clearSession();
           } else {
-            console.error('Failed to validate auth state:', err);
-
             const storedUser = await storage.getItem('user');
             if (storedUser) {
+              console.warn('Auth validation unavailable, using cached session:', err);
               setToken(storedToken);
               setUser(JSON.parse(storedUser));
+              return;
+            }
+
+            try {
+              const profileRes = await authService.getProfile();
+              const nextUser = mapApiUser(profileRes.user);
+              await persistSession(storedToken, nextUser);
+            } catch (profileErr) {
+              console.warn('Auth profile fallback unavailable, clearing session:', profileErr);
+              await clearSession();
             }
           }
         }
@@ -120,11 +133,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await persistSession(res.token, mapApiUser(res.user));
   }, [persistSession]);
 
-  const updateProfile = useCallback(async ({ name, email }: ProfileUpdateInput) => {
-    const res = await authService.updateProfile({ name, email });
-    const nextUser = mapApiUser(res.user);
+  const updateProfile = useCallback(async ({ name, email, whatsapp }: ProfileUpdateInput) => {
+    const res = await authService.updateProfile({ name, email, whatsapp });
+    const nextUser = {
+      ...mapApiUser(res.user),
+      username: res.user.username || name,
+      email: res.user.email || email,
+      whatsapp: res.user.whatsapp ?? res.user.phoneNumber ?? res.user.phone ?? whatsapp ?? null,
+    };
     await storage.setItem('user', JSON.stringify(nextUser));
     setUser(nextUser);
+    return nextUser;
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {

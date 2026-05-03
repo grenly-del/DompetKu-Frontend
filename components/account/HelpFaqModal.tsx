@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -24,7 +25,6 @@ const faqData: FaqItem[] = [
   { q: "Bagaimana cara menambah transaksi?", a: "Tap tombol \"+\" di halaman utama, lalu pilih Pemasukan atau Pengeluaran. Isi detail transaksi dan tap Simpan." },
   { q: "Apakah data saya aman?", a: "Ya, semua data tersimpan secara lokal di perangkat kamu dan tidak dikirim ke server manapun." },
   { q: "Bagaimana cara membuat budget?", a: "Buka menu Budget Plan dari halaman utama, lalu tentukan limit anggaran untuk setiap kategori." },
-  { q: "Bisakah saya export data?", a: "Ya! Buka Akun → Export Data, pilih format file (CSV/PDF/Excel) dan rentang waktu yang diinginkan." },
   { q: "Bagaimana cara menghapus transaksi?", a: "Geser transaksi ke kiri di halaman Riwayat, lalu tap tombol hapus yang muncul." },
   { q: "Apakah bisa menambah kategori baru?", a: "Tentu! Buka menu Kategori dan tap tombol \"Tambah\" untuk membuat kategori pemasukan atau pengeluaran baru." },
 ];
@@ -51,7 +51,10 @@ function FaqCard({ item, index }: { item: FaqItem; index: number }) {
 }
 
 export default function HelpFaqModal({ visible, onClose }: Props) {
+  const insets = useSafeAreaInsets();
   const slide = React.useRef(new Animated.Value(SH)).current;
+  const safeBottomPadding = 28 + Math.max(insets.bottom, 12);
+  const sheetMaxHeight = SH - insets.top - Math.max(insets.bottom, 12) - 16;
 
   useEffect(() => {
     if (visible) {
@@ -69,7 +72,16 @@ export default function HelpFaqModal({ visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <View style={s.overlay}>
         <Pressable style={s.backdrop} onPress={handleClose} />
-        <Animated.View style={[s.sheet, { transform: [{ translateY: slide }] }]}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              maxHeight: sheetMaxHeight,
+              paddingBottom: safeBottomPadding,
+              transform: [{ translateY: slide }],
+            },
+          ]}
+        >
           <View style={s.handle} />
 
           <View style={s.headerRow}>

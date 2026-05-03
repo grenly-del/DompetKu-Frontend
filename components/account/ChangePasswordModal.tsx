@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
@@ -31,7 +32,10 @@ export default function ChangePasswordModal({ visible, onClose, onSave }: Props)
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const insets = useSafeAreaInsets();
   const slide = React.useRef(new Animated.Value(SH)).current;
+  const safeBottomPadding = 28 + Math.max(insets.bottom, 12);
+  const sheetMaxHeight = SH - insets.top - Math.max(insets.bottom, 12) - 16;
 
   useEffect(() => {
     if (visible) {
@@ -80,7 +84,16 @@ export default function ChangePasswordModal({ visible, onClose, onSave }: Props)
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <Pressable style={s.backdrop} onPress={handleClose} />
-        <Animated.View style={[s.sheet, { transform: [{ translateY: slide }] }]}>
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              maxHeight: sheetMaxHeight,
+              paddingBottom: safeBottomPadding,
+              transform: [{ translateY: slide }],
+            },
+          ]}
+        >
           <View style={s.handle} />
 
           <View style={s.headerRow}>

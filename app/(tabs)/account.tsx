@@ -23,19 +23,16 @@ import {
 } from "@expo-google-fonts/poppins";
 
 import EditProfileModal from "../../components/account/EditProfileModal";
-import NotificationModal from "../../components/account/NotificationModal";
-import AppearanceModal from "../../components/account/AppearanceModal";
 import ChangePasswordModal from "../../components/account/ChangePasswordModal";
-import ExportDataModal from "../../components/account/ExportDataModal";
 import DeleteAccountModal from "../../components/account/DeleteAccountModal";
 import HelpFaqModal from "../../components/account/HelpFaqModal";
 import AboutAppModal from "../../components/account/AboutAppModal";
 import { authService } from "../../services/auth.service";
-import {
-  defaultNotificationSettings,
-  loadNotificationSettings,
-  type NotificationSettings,
-} from "../../services/notification.service";
+import SkeletonLoader, {
+  ProfileHeaderSkeleton,
+  StatsSkeleton,
+  MenuCardSkeleton,
+} from "../../components/common/SkeletonLoader";
 
 type MenuItemProps = {
   icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -72,17 +69,13 @@ const defaultStats: AccountStats = {
   budgetCount: 0,
 };
 
-const themeLabels: Record<string, string> = {
-  light: "Terang",
-  dark: "Gelap",
-  ocean: "Lautan",
-  sunset: "Senja",
-};
-
 function MenuItem({ icon, label, subtitle, color, bgColor, onPress }: MenuItemProps) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+      style={({ pressed, hovered }) => [
+        styles.menuItem,
+        (pressed || hovered) && styles.menuItemPressed,
+      ]}
       onPress={onPress}
     >
       <View style={[styles.menuIconWrap, { backgroundColor: bgColor }]}>
@@ -121,8 +114,22 @@ function formatMemberSince(createdAt?: string) {
   }).format(parsed);
 }
 
-function getEnabledNotificationCount(settings: NotificationSettings) {
-  return Object.values(settings).filter(Boolean).length;
+function toProfileState(user: {
+  username?: string;
+  email?: string;
+  whatsapp?: string | null;
+  phoneNumber?: string | null;
+  phone?: string | null;
+  provider?: string;
+  createdAt?: string;
+}): ProfileState {
+  return {
+    name: user.username ?? defaultProfile.name,
+    email: user.email ?? defaultProfile.email,
+    whatsapp: user.whatsapp ?? user.phoneNumber ?? user.phone ?? defaultProfile.whatsapp,
+    provider: user.provider,
+    createdAt: user.createdAt,
+  };
 }
 
 export default function AccountTab() {
@@ -146,8 +153,7 @@ export default function AccountTab() {
     createdAt: user?.createdAt,
   });
   const [accountStats, setAccountStats] = useState<AccountStats>(defaultStats);
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(defaultNotificationSettings);
-  const [theme, setTheme] = useState("light");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setProfile({
@@ -162,32 +168,43 @@ export default function AccountTab() {
   const refreshAccountData = useCallback(async () => {
     if (!userId) {
       setAccountStats(defaultStats);
-      setNotificationSettings(defaultNotificationSettings);
+      setIsLoading(false);
       return;
     }
 
     try {
-      const [summary, nextNotificationSettings] = await Promise.all([
-        authService.getAccountSummary(),
-        loadNotificationSettings(userId),
-      ]);
-
-      setProfile({
-        name: summary.user.username,
-        email: summary.user.email,
-        whatsapp: summary.user.whatsapp,
-        provider: summary.user.provider,
-        createdAt: summary.user.createdAt,
-      });
+      const summary = await authService.getAccountSummary();
+      setProfile(toProfileState(summary.user));
       setAccountStats(summary.stats);
-      setNotificationSettings(nextNotificationSettings);
     } catch (err) {
-      console.error("Failed to refresh account data:", err);
+      console.warn("Account summary unavailable, falling back to profile data:", err);
 
-      const nextNotificationSettings = await loadNotificationSettings(userId);
-      setNotificationSettings(nextNotificationSettings);
+      try {
+        const profileRes = await authService.getProfile();
+        setProfile(toProfileState(profileRes.user));
+      } catch (profileErr) {
+        console.warn("Profile fallback unavailable, trying current user endpoint:", profileErr);
+
+        try {
+          const currentUserRes = await authService.getCurrentUser();
+          setProfile(toProfileState(currentUserRes.user));
+        } catch (currentUserErr) {
+          console.warn("Current user fallback unavailable, using cached auth user:", currentUserErr);
+          setProfile({
+            name: user?.username ?? defaultProfile.name,
+            email: user?.email ?? defaultProfile.email,
+            whatsapp: user?.whatsapp ?? defaultProfile.whatsapp,
+            provider: user?.provider,
+            createdAt: user?.createdAt,
+          });
+        }
+      }
+
+      setAccountStats(defaultStats);
+    } finally {
+      setIsLoading(false);
     }
-  }, [userId]);
+  }, [user, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -196,21 +213,13 @@ export default function AccountTab() {
   );
 
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showNotification, setShowNotification] = useState(false);
-  const [showAppearance, setShowAppearance] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showExportData, setShowExportData] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showHelpFaq, setShowHelpFaq] = useState(false);
   const [showAboutApp, setShowAboutApp] = useState(false);
 
   const providerLabel = useMemo(() => formatProvider(profile.provider), [profile.provider]);
   const memberSinceLabel = useMemo(() => formatMemberSince(profile.createdAt), [profile.createdAt]);
-  const notificationCount = useMemo(
-    () => getEnabledNotificationCount(notificationSettings),
-    [notificationSettings]
-  );
-  const currentThemeLabel = themeLabels[theme] || "Terang";
   const supportsPasswordChange = profile.provider !== "GOOGLE";
 
   const handleLogout = () => {
@@ -233,11 +242,20 @@ export default function AccountTab() {
   }, [deleteAccount, router]);
 
   const handleUpdateProfile = useCallback(
-    async (data: { name: string; email: string }) => {
-      await updateProfile(data);
-      await refreshAccountData();
+    async (data: { name: string; email: string; whatsapp?: string | null }) => {
+      const nextUser = await updateProfile(data);
+      const nextWhatsapp = nextUser.whatsapp ?? data.whatsapp ?? null;
+
+      setProfile((current) => ({
+        ...current,
+        name: nextUser.username || data.name,
+        email: nextUser.email || data.email,
+        whatsapp: nextWhatsapp,
+        provider: nextUser.provider ?? current.provider,
+        createdAt: nextUser.createdAt ?? current.createdAt,
+      }));
     },
-    [refreshAccountData, updateProfile]
+    [updateProfile]
   );
 
   const handleOpenChangePassword = useCallback(() => {
@@ -251,11 +269,19 @@ export default function AccountTab() {
 
   if (!fontsLoaded) return <View style={styles.loading} />;
 
+  const floatingTabBottomPadding = 104;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0D2349" />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: floatingTabBottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <LinearGradient
           colors={["#0D2349", "#12406A", "#0C8C76"]}
           start={{ x: 0, y: 0 }}
@@ -263,39 +289,61 @@ export default function AccountTab() {
           style={styles.header}
         >
           <View style={styles.headerOrb} />
-          <View style={styles.profileRow}>
-            <View style={styles.avatarWrap}>
-              <MaterialCommunityIcons name="account" size={36} color="#FFFFFF" />
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profile.name}</Text>
-              <Text style={styles.profileEmail}>{profile.email}</Text>
-              <View style={styles.metaRow}>
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipText}>{providerLabel}</Text>
+          {isLoading ? (
+            <>
+              <ProfileHeaderSkeleton />
+              <StatsSkeleton />
+            </>
+          ) : (
+            <>
+              <View style={styles.profileRow}>
+                <View style={styles.avatarWrap}>
+                  <MaterialCommunityIcons name="account" size={36} color="#FFFFFF" />
                 </View>
-                <Text style={styles.memberText}>Bergabung {memberSinceLabel}</Text>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>{profile.name}</Text>
+                  <Text style={styles.profileEmail}>{profile.email}</Text>
+                  <Text style={styles.profileWhatsapp}>{profile.whatsapp || ""}</Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaChip}>
+                      <Text style={styles.metaChipText}>{providerLabel}</Text>
+                    </View>
+                    <Text style={styles.memberText}>Bergabung {memberSinceLabel}</Text>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
 
-          <View style={styles.profileStats}>
-            <View style={styles.profStatItem}>
-              <Text style={styles.profStatValue}>{accountStats.transactionCount}</Text>
-              <Text style={styles.profStatLabel}>Transaksi</Text>
-            </View>
-            <View style={styles.profStatDivider} />
-            <View style={styles.profStatItem}>
-              <Text style={styles.profStatValue}>{accountStats.categoryCount}</Text>
-              <Text style={styles.profStatLabel}>Kategori</Text>
-            </View>
-            <View style={styles.profStatDivider} />
-            <View style={styles.profStatItem}>
-              <Text style={styles.profStatValue}>{accountStats.budgetCount}</Text>
-              <Text style={styles.profStatLabel}>Budget</Text>
-            </View>
-          </View>
+              <View style={styles.profileStats}>
+                <View style={styles.profStatItem}>
+                  <Text style={styles.profStatValue}>{accountStats.transactionCount}</Text>
+                  <Text style={styles.profStatLabel}>Transaksi</Text>
+                </View>
+                <View style={styles.profStatDivider} />
+                <View style={styles.profStatItem}>
+                  <Text style={styles.profStatValue}>{accountStats.categoryCount}</Text>
+                  <Text style={styles.profStatLabel}>Kategori</Text>
+                </View>
+                <View style={styles.profStatDivider} />
+                <View style={styles.profStatItem}>
+                  <Text style={styles.profStatValue}>{accountStats.budgetCount}</Text>
+                  <Text style={styles.profStatLabel}>Budget</Text>
+                </View>
+              </View>
+            </>
+          )}
         </LinearGradient>
+
+        {isLoading ? (
+          <>
+            <SkeletonLoader width={80} height={12} borderRadius={6} style={{ marginTop: 24, marginBottom: 10, marginLeft: 4 }} />
+            <MenuCardSkeleton rows={3} />
+            <SkeletonLoader width={110} height={12} borderRadius={6} style={{ marginTop: 24, marginBottom: 10, marginLeft: 4 }} />
+            <MenuCardSkeleton rows={3} />
+            <SkeletonLoader width={70} height={12} borderRadius={6} style={{ marginTop: 24, marginBottom: 10, marginLeft: 4 }} />
+            <MenuCardSkeleton rows={2} />
+          </>
+        ) : (
+          <>
 
         <Text style={styles.sectionLabel}>Pengaturan</Text>
         <View style={styles.menuCard}>
@@ -306,24 +354,6 @@ export default function AccountTab() {
             color="#12406A"
             bgColor="rgba(18,64,106,0.12)"
             onPress={() => setShowEditProfile(true)}
-          />
-          <View style={styles.menuDivider} />
-          <MenuItem
-            icon="bell-outline"
-            label="Notifikasi"
-            subtitle={`${notificationCount} pengingat aktif untuk akun ini`}
-            color="#0C8C76"
-            bgColor="rgba(12,140,118,0.12)"
-            onPress={() => setShowNotification(true)}
-          />
-          <View style={styles.menuDivider} />
-          <MenuItem
-            icon="palette-outline"
-            label="Tampilan"
-            subtitle={`Tema saat ini: ${currentThemeLabel}`}
-            color="#3D52A0"
-            bgColor="rgba(61,82,160,0.12)"
-            onPress={() => setShowAppearance(true)}
           />
         </View>
 
@@ -337,16 +367,6 @@ export default function AccountTab() {
             bgColor="rgba(18,64,106,0.12)"
             onPress={handleOpenChangePassword}
           />
-          <View style={styles.menuDivider} />
-          <MenuItem
-            icon="cloud-download-outline"
-            label="Export Data"
-            subtitle={`${accountStats.transactionCount} transaksi siap diekspor`}
-            color="#0C8C76"
-            bgColor="rgba(12,140,118,0.12)"
-            onPress={() => setShowExportData(true)}
-          />
-          <View style={styles.menuDivider} />
           <MenuItem
             icon="delete-outline"
             label="Hapus Akun"
@@ -389,6 +409,8 @@ export default function AccountTab() {
         <Text style={styles.versionText}>
           DompetKu v1.0.0 • Login {providerLabel} • Bergabung {memberSinceLabel}
         </Text>
+          </>
+        )}
       </ScrollView>
 
       <EditProfileModal
@@ -397,28 +419,10 @@ export default function AccountTab() {
         profile={{ name: profile.name, email: profile.email, whatsapp: profile.whatsapp }}
         onSave={handleUpdateProfile}
       />
-      <NotificationModal
-        visible={showNotification}
-        onClose={() => setShowNotification(false)}
-        userId={userId}
-        onSettingsChange={setNotificationSettings}
-      />
-      <AppearanceModal
-        visible={showAppearance}
-        onClose={() => setShowAppearance(false)}
-        currentTheme={theme}
-        onSelectTheme={setTheme}
-      />
       <ChangePasswordModal
         visible={showChangePassword}
         onClose={() => setShowChangePassword(false)}
         onSave={changePassword}
-      />
-      <ExportDataModal
-        visible={showExportData}
-        onClose={() => setShowExportData(false)}
-        profile={{ username: profile.name, email: profile.email }}
-        stats={accountStats}
       />
       <DeleteAccountModal
         visible={showDeleteAccount}
@@ -461,6 +465,7 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1 },
   profileName: { fontSize: 16, fontFamily: "Poppins_700Bold", color: "#FFF" },
   profileEmail: { fontSize: 13, fontFamily: "Poppins_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  profileWhatsapp: { fontSize: 12, fontFamily: "Poppins_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 2 },
   metaRow: { marginTop: 8, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
   metaChip: {
     paddingHorizontal: 10,
@@ -495,13 +500,22 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: "#FFF",
     paddingHorizontal: 4,
+    paddingVertical: 4,
     shadowColor: "#0F172A",
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  menuItem: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, paddingHorizontal: 16 },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginHorizontal: 2,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+  },
   menuItemPressed: { backgroundColor: "#F8FAFC" },
   menuIconWrap: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   menuTextWrap: { flex: 1 },
